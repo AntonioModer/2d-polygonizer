@@ -124,6 +124,10 @@ function ir:get_field_value(x, y)
   return self:_evaluate_field_function(r)
 end
 
+function ir:get_center()
+  return self.bbox.x + 0.5 * self.bbox.width, self.bbox.y + 0.5 * self.bbox.height
+end
+
 function ir:_evaluate_field_function(r)
   local val = 1 - self.field_a * r*r*r*r*r*r + self.field_b * r*r*r*r - self.field_c * r*r
   return val * self.weight

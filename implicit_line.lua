@@ -110,6 +110,10 @@ function il:get_field_value(x, y)
   return self:_evaluate_field_function(r)
 end
 
+function il:get_center()
+  return self.x1 + 0.5 * (self.x2 - self.x1), self.y1 + 0.5 * (self.y2 - self.y1)
+end
+
 function il:_evaluate_field_function(r)
   local val = 1 - self.field_a * r*r*r*r*r*r + self.field_b * r*r*r*r - self.field_c * r*r
   return val * self.weight

@@ -73,6 +73,10 @@ function ip:get_field_value(x, y)
   return self:_evaluate_field_function(r)
 end
 
+function ip:get_center()
+  return self.x, self.y
+end
+
 function ip:_evaluate_field_function(r)
   local val = 1 - self.field_a * r*r*r*r*r*r + self.field_b * r*r*r*r - self.field_c * r*r
   return val * self.weight

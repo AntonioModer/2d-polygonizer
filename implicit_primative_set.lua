@@ -54,6 +54,10 @@ function ips:get_field_value(x, y)
   return f
 end
 
+function ips:get_primatives()
+  return self.primatives
+end
+
 function ips:get_primative_at_position(x, y)
   local ip
   for i=1,#self.primatives do

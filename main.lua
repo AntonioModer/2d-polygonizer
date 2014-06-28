@@ -1,3 +1,4 @@
+require("table_utils")
 math.randomseed(os.time())
 math.random()
 math.random()
@@ -7,11 +8,26 @@ function love.keypressed(key)
   if key == "escape" then
     love.event.push("quit")
   end
+  
+  polygonizer:keypressed(key)
+end
+
+function love.keyreleased(key)
+  polygonizer:keyreleased(key)
+end
+
+function love.mousepressed(x, y, button)
+  polygonizer:mousepressed(x, y, button)
+end
+
+function love.mousereleased(x, y, button)
+  polygonizer:mousereleased(x, y, button)
 end
 
 local function init()
   -- objects
   bbox = require("bbox")
+  polygonizer = require("polygonizer")
   implicit_primative_set = require("implicit_primative_set")
   implicit_point = require("implicit_point")
   implicit_line = require("implicit_line")
@@ -21,6 +37,7 @@ local function init()
   lg = love.graphics
   SCR_WIDTH = lg.getWidth()
   SCR_HEIGHT = lg.getHeight()
+  DEBUG = true
   
   -- graphics
   lg.setPointStyle("rough")
@@ -29,27 +46,29 @@ end
 
 function love.load()
   init()
+
+  pwidth, pheight = 1000, 700
+  polygonizer = polygonizer:new(10, 10, 1000, 700)
   
-  rect = implicit_rectangle:new(200, 200, 300, 100, 100)
-  rect:set_position(120, 300)
-  rect:set_rectangle(200, 120, 200, 300)
-  
-  line = implicit_line:new(500, 200, 400, 400, 120)
-  point = implicit_point:new(600, 400, 200)
-  
-  set = implicit_primative_set:new()
-  set:add_primative(rect)
-  set:add_primative(line)
-  set:add_primative(point)
+  polygonizer:add_point(200, 200)
+  polygonizer:add_line(360, 200, 500, 500)
+  polygonizer:add_rectangle(600, 200, 100, 300)
 end
 
 function love.update(dt)
-  local mx, my = love.mouse.getPosition()
+  polygonizer:update(dt)
+
   
-  local p = set:get_primative_at_position(mx, my)
-  print(set:get_field_value(mx, my))
 end
 
 function love.draw()
-  set:draw()
+  polygonizer:draw()
+  
+  if DEBUG then
+    lg.setColor(0,0,0,255)
+    lg.print("FPS: "..love.timer.getFPS(), 0, 0)
+  end
 end
+
+
+
