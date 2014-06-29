@@ -77,6 +77,10 @@ function il:set_radius(r)
   self:_init_field_function_coefficients()
 end
 
+function il:get_radius()
+  return self.radius
+end
+
 function il:set_weight(c)
   self.weight = c
 end

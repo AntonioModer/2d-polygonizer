@@ -26,6 +26,14 @@ function ips:add_primative(ip)
   self.primatives[#self.primatives + 1] = ip
 end
 
+function ips:remove_primative(primative)
+  for i=1,#self.primatives do
+    if self.primatives[i] == primative then
+      table.remove(self.primatives, i)
+    end
+  end
+end
+
 function ips:set_ricci_blend(k)
   self.ricci_blend = k
 end

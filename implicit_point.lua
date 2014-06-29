@@ -61,6 +61,10 @@ function ip:set_radius(r)
   self:_init_field_function_coefficients()
 end
 
+function ip:get_radius()
+  return self.radius
+end
+
 function ip:set_weight(c)
   self.weight = c
 end

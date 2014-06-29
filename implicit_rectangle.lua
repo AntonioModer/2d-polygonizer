@@ -82,6 +82,10 @@ function ir:set_radius(r)
   self:_init_field_function_coefficients()
 end
 
+function ir:get_radius()
+  return self.radius
+end
+
 function ir:set_weight(c)
   self.weight = c
 end

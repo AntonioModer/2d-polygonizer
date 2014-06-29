@@ -4,6 +4,8 @@
 -- polygonizer object
 --[[----------------------------------------------------------------------]]--
 --##########################################################################--
+local lg = love.graphics
+
 local CELL_QUAD = 1
 local HORIZONTAL_QUAD = 2
 local VERTICAL_QUAD = 3
@@ -14,6 +16,12 @@ local UI_SELECT = 0
 local UI_ADD_POINT = 1
 local UI_ADD_LINE = 2
 local UI_ADD_RECTANGLE = 3
+local UI_ANIMATE = 4
+
+local font_normal = lg.newFont("LiberationMono-Regular.ttf", 20)
+local font_small = lg.newFont("LiberationMono-Regular.ttf", 16)
+local font_small_bold = lg.newFont("LiberationMono-Bold.ttf", 16)
+local font_bold = lg.newFont("LiberationMono-Bold.ttf", 20)
 
 local pgr = {}
 pgr.table = 'pgr'
@@ -29,6 +37,9 @@ pgr.cols = nil
 pgr.rows = nil
 
 pgr.default_radius = 100
+pgr.min_radius = 20
+pgr.max_radius = 300
+pgr.radius_change_speed = 200
 pgr.surface_threshold = 0.2
 
 pgr.cell_inside_case = 16
@@ -48,6 +59,7 @@ pgr.is_current = false
 
 pgr.ui_mode = UI_SELECT
 pgr.selected_primative = nil
+pgr.interface_buttons = nil
 
 pgr.marching_square_draw_cases = {}
 
@@ -202,8 +214,46 @@ function pgr:new(x, y, width, height)
   pgr.bbox = bbox:new(x, y, width, height)
   
   pgr:_init_textures()
+  pgr:_init_interface_buttons()
   
   return pgr
+end
+
+function pgr:_init_interface_buttons()
+  local ix, iy = 950, 50
+  local x, y = ix, iy
+  local xpad = 30
+  local bpad = 15
+  
+  local buttons = {}
+  
+  local str = "Select"
+  local bbox = bbox:new(x, y, font_normal:getWidth(str) + bpad, font_normal:getHeight(str))
+  buttons[1] = {text = str, mode = UI_SELECT, bbox = bbox}
+  
+  local x = x + font_normal:getWidth(str) + xpad
+  local str = "Animate"
+  local bbox = bbox:new(x, y, font_normal:getWidth(str) + bpad, font_normal:getHeight(str))
+  buttons[2] = {text = str, mode = UI_ANIMATE, bbox = bbox}
+  
+  local x, y = ix, y + 40
+  local str = "Add Point"
+  local bbox = bbox:new(x, y, font_normal:getWidth(str) + bpad, font_normal:getHeight(str))
+  buttons[3] = {text = str, mode = UI_ADD_POINT, bbox = bbox}
+  
+  local x = x + font_normal:getWidth(str) + xpad
+  local str = "Add Line"
+  local bbox = bbox:new(x, y, font_normal:getWidth(str) + bpad, font_normal:getHeight(str))
+  buttons[4] = {text = str, mode = UI_ADD_LINE, bbox = bbox}
+  
+  local x = x + font_normal:getWidth(str) + xpad
+  local str = "Add Rectangle"
+  local bbox = bbox:new(x, y, font_normal:getWidth(str) + bpad, font_normal:getHeight(str))
+  buttons[5] = {text = str, mode = UI_ADD_RECTANGLE, bbox = bbox}
+  
+  self.interface_buttons = buttons
+  self.selected_interface_button = buttons[3]
+  self.ui_mode = UI_ADD_POINT
 end
 
 function pgr:_generate_triangle_image(width, height)
@@ -284,6 +334,16 @@ end
 
 function pgr:mousepressed(x, y, button)
   if not self.bbox:contains_coordinate(x, y) then
+    -- check for interface selection
+    local btns = self.interface_buttons
+    for i=1,#btns do
+      local b = btns[i]
+      if b.bbox:contains_coordinate(x, y) then
+        self.selected_interface_button = b
+        self.ui_mode = b.mode
+      end
+    end
+    
     return
   end
   
@@ -292,6 +352,15 @@ function pgr:mousepressed(x, y, button)
   if mode == UI_SELECT and button == "l" then
     local prim = self.primatives:get_primative_at_position(x, y)
     self.selected_primative = prim
+  end
+  
+  if button == "r" then
+    local prim = self.primatives:get_primative_at_position(x, y)
+    self.primatives:remove_primative(prim)
+    if self.selected_primative == prim then
+      self.selected_primative = nil
+    end
+    self.is_current = false
   end
 end
 
@@ -566,11 +635,37 @@ function pgr:_draw_to_spritebatch()
 end
 
 ------------------------------------------------------------------------------
-function pgr:_update_primative_selection()
+function pgr:_update_primative_selection(dt)
   if not (self.ui_mode == UI_SELECT and self.selected_primative) then
     return
   end
   
+  -- update radius
+  local primative = self.selected_primative
+  local min, max = self.min_radius, self.max_radius
+  local speed = self.radius_change_speed
+  local current_radius = primative:get_radius()
+  local orig_radius = current_radius
+  if     love.keyboard.isDown("up") then
+    current_radius = current_radius + speed * dt
+  elseif love.keyboard.isDown("down") then
+    current_radius = current_radius - speed * dt
+  end
+  current_radius = math.min(current_radius, max)
+  current_radius = math.max(current_radius, min)
+  primative:set_radius(current_radius)
+  
+  -- make sure primative's bbox is still inside the polygonizer bbox
+  local bbox = primative:get_bbox()
+  if not self.bbox:contains(bbox) then
+    primative:set_radius(orig_radius)
+  end
+  
+  if current_radius ~= orig_radius then
+    self.is_current = false
+  end
+  
+  -- update move
   if not love.mouse.isDown("l") then
     return
   end
@@ -590,7 +685,7 @@ function pgr:_update_primative_selection()
 end
 
 function pgr:update(dt)
-  self:_update_primative_selection()
+  self:_update_primative_selection(dt)
 
   if self.is_current then return end
   
@@ -690,6 +785,80 @@ function pgr:_draw_debug()
   lg.print(case, x, y)
 end
 
+function pgr:_draw_interface_buttons()
+  local buttons = self.interface_buttons
+  local xpad, ypad = 7.5, 0
+  lg.setFont(font_normal)
+  
+  for i=1,#buttons do
+    lg.setColor(0, 0, 0, 150)
+    if self.selected_interface_button == buttons[i] then
+      lg.setColor(0, 0, 255, 255)
+    end
+    
+    local btn = buttons[i]
+    btn.bbox:draw()
+    lg.print(btn.text, btn.bbox.x + xpad, btn.bbox.y)
+  end
+end
+
+function pgr:_draw_interface_descriptions()
+  local buttons = self.interface_buttons
+  local x, y = buttons[1].bbox.x, buttons[1].bbox.y + 100
+  lg.setColor(0, 0, 0, 255)
+  local mode = self.ui_mode
+  if     mode == UI_SELECT then
+    lg.setFont(font_bold)
+    lg.print("Object Selection:", x, y)
+    lg.setFont(font_small)
+    lg.print(
+[[To select an object, hover over the object with
+the mouse and press the left button
+
+To remove an object, hover over the object with
+the mouse and press the right button
+               
+To move an object, hold down the left mouse 
+button and drag to the desired position
+
+To change the radius of an object, select the 
+object and press the up or down key on the 
+keyboard to increase or decrease the radius]], x ,y + 30)
+  elseif mode == UI_ANIMATE then
+    lg.setFont(font_bold)
+    lg.print("Animation:", x, y)
+    lg.setFont(font_small)
+    lg.print("There is nothing to do here but watch", x ,y + 30)
+  elseif mode == UI_ADD_POINT then
+    lg.setFont(font_bold)
+    lg.print("Add a Point:", x, y)
+    lg.setFont(font_small)
+    lg.print("press and release the left mouse button", x,y + 30)
+  elseif mode == UI_ADD_LINE then
+    lg.setFont(font_bold)
+    lg.print("Add a Line:", x, y)
+    lg.setFont(font_small)
+    lg.print("hold down the left mouse button,\ndrag the mouse, and release", x,y + 30)
+  elseif mode == UI_ADD_RECTANGLE then
+    lg.setFont(font_bold)
+    lg.print("Add a Rectangle:", x, y)
+    lg.setFont(font_small)
+    lg.print("hold down the left mouse button,\ndrag the mouse, and release", x,y + 30)
+  end
+end
+
+function pgr:_draw_interface()
+  local ix, iy = SCR_WIDTH - 490, 20
+  lg.setFont(font_bold)
+  lg.setColor(0, 0, 0, 255)
+  local str = "Interface Modes:"
+  lg.print(str, ix, iy)
+  
+  self:_draw_interface_buttons()
+  self:_draw_interface_descriptions()
+  
+end
+
 ------------------------------------------------------------------------------
 function pgr:draw()
   lg.setColor(0, 0, 0, 255)
@@ -699,6 +868,7 @@ function pgr:draw()
   lg.draw(self.spritebatch, 0, 0)
   
   self:_draw_selected_primative()
+  self:_draw_interface()
   
 
   if not self.debug then return end
