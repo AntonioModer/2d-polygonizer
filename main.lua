@@ -50,9 +50,9 @@ function love.load()
   pwidth, pheight = 1000, 700
   polygonizer = polygonizer:new(10, 10, 1000, 700)
   
-  polygonizer:add_point(200, 200)
+  polygonizer:add_point(210, 200)
   polygonizer:add_line(360, 200, 500, 500)
-  polygonizer:add_rectangle(600, 200, 100, 300)
+  polygonizer:add_rectangle(750, 200, 100, 300)
 end
 
 function love.update(dt)

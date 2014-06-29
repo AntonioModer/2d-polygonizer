@@ -4,28 +4,174 @@
 -- polygonizer object
 --[[----------------------------------------------------------------------]]--
 --##########################################################################--
+local CELL_QUAD = 1
+local HORIZONTAL_QUAD = 2
+local VERTICAL_QUAD = 3
+local TRIANGLE_QUAD = 4
+local TILE_QUAD = 5
+
 local pgr = {}
 pgr.table = 'pgr'
-pgr.debug = true
+pgr.debug = false
 pgr.primatives = nil
 pgr.bbox = nil
 
-pgr.tile_width = 5
-pgr.tile_height = 5
+pgr.tile_width = 4
+pgr.tile_height = 4
 pgr.cell_width = 2 * pgr.tile_width
 pgr.cell_height = 2 * pgr.tile_height
 pgr.cols = nil
 pgr.rows = nil
 
 pgr.default_radius = 150
-pgr.surface_threshold = 0.5
+pgr.surface_threshold = 0.2
 
 pgr.cell_inside_case = 16
 pgr.cell_outside_case = 1
 
+pgr.surface_cells = nil
+pgr.flood_fill_cells = nil
+
+pgr.spritebatch_image = nil
+pgr.spritebatch_quads = nil
+pgr.spritebatch = nil
+pgr.gradient = require("orangeyellow")
+
 pgr.marked_cells = nil
 pgr.cell_queue = nil
 pgr.is_current = false
+
+pgr.marching_square_draw_cases = {}
+
+do
+  local cases = pgr.marching_square_draw_cases
+  local tw, th = pgr.tile_width, pgr.tile_height
+  local upright = 0
+  local downright = math.pi / 2
+  local downleft = math.pi
+  local upleft = 3 * math.pi / 2
+  local ox, oy = 0.5 * tw, 0.5 * th
+  
+  cases[1] = function(x, y)
+               -- blank case
+             end
+  cases[2] = function(self, x, y)
+               local q = self.spritebatch_quads
+               local batch = self.spritebatch
+               batch:add(q[TRIANGLE_QUAD], x + ox, y + th + oy, upright,
+                               1, 1, ox, oy)
+             end
+  cases[3] = function(self, x, y)
+               local q = self.spritebatch_quads
+               local batch = self.spritebatch
+               batch:add(q[TRIANGLE_QUAD], x + tw + ox, y + th + oy, upleft,
+                               1, 1, ox, oy)
+             end
+  cases[4] = function(self, x, y)
+               local q = self.spritebatch_quads
+               local batch = self.spritebatch
+               batch:add(q[HORIZONTAL_QUAD], x, y + th)
+             end
+  cases[5] = function(self, x, y)
+               local q = self.spritebatch_quads
+               local batch = self.spritebatch
+               batch:add(q[TRIANGLE_QUAD], x + tw + ox, y + oy, downleft,
+                               1, 1, ox, oy)
+             end
+  cases[6] = function(self, x, y)
+               local q = self.spritebatch_quads
+               local batch = self.spritebatch
+               batch:add(q[TRIANGLE_QUAD], x + ox, y + oy, upleft,
+                               1, 1, ox, oy)
+                               
+               batch:add(q[TRIANGLE_QUAD], x + tw + ox, y + th + oy, downright,
+                               1, 1, ox, oy)
+                               
+               batch:add(q[TILE_QUAD], x + tw, y)
+               
+               batch:add(q[TILE_QUAD], x, y + th)
+             end
+  cases[7] = function(self, x, y)
+               local q = self.spritebatch_quads
+               local batch = self.spritebatch
+               batch:add(q[VERTICAL_QUAD], x + tw, y)
+             end
+  cases[8] = function(self, x, y)
+               local q = self.spritebatch_quads
+               local batch = self.spritebatch
+               batch:add(q[TRIANGLE_QUAD], x + ox, y + oy, upleft,
+                               1, 1, ox, oy)
+                      
+               batch:add(q[TILE_QUAD], x + tw, y)
+                               
+               batch:add(q[HORIZONTAL_QUAD], x, y + th)
+             end
+  cases[9] = function(self, x, y)
+               local q = self.spritebatch_quads
+               local batch = self.spritebatch
+               batch:add(q[TRIANGLE_QUAD], x + ox, y + oy, downright,
+                               1, 1, ox, oy)
+             end
+  cases[10] = function(self, x, y)
+                local q = self.spritebatch_quads
+                local batch = self.spritebatch
+                batch:add(q[VERTICAL_QUAD], x, y)
+              end
+  cases[11] = function(self, x, y)
+                local q = self.spritebatch_quads
+                local batch = self.spritebatch
+                batch:add(q[TRIANGLE_QUAD], x + tw + ox, y + oy, upright,
+                                1, 1, ox, oy)
+                               
+                batch:add(q[TRIANGLE_QUAD], x + ox, y + th + oy, downleft,
+                                1, 1, ox, oy)
+               
+                batch:add(q[TILE_QUAD], x, y)
+                
+                batch:add(q[TILE_QUAD], x + tw, y + th)
+              end
+  cases[12] = function(self, x, y)
+                local q = self.spritebatch_quads
+                local batch = self.spritebatch
+                batch:add(q[TRIANGLE_QUAD], x + tw + ox, y + oy, upright,
+                                1, 1, ox, oy)
+                      
+                batch:add(q[TILE_QUAD], x, y)
+                               
+                batch:add(q[HORIZONTAL_QUAD], x, y + th)
+              end
+  cases[13] = function(self, x, y)
+                local q = self.spritebatch_quads
+                local batch = self.spritebatch
+                batch:add(q[HORIZONTAL_QUAD], x, y)
+              end
+  cases[14] = function(self, x, y)
+                local q = self.spritebatch_quads
+                local batch = self.spritebatch
+                batch:add(q[TRIANGLE_QUAD], x + tw + ox, y + th + oy, downright,
+                                1, 1, ox, oy)
+                      
+                batch:add(q[TILE_QUAD], x + tw, y)
+                               
+                batch:add(q[VERTICAL_QUAD], x, y)
+              end
+  cases[15] = function(self, x, y)
+                local q = self.spritebatch_quads
+                local batch = self.spritebatch
+                batch:add(q[TRIANGLE_QUAD], x + ox, y + th + oy, downleft,
+                                1, 1, ox, oy)
+                      
+                batch:add(q[TILE_QUAD], x, y)
+                               
+                batch:add(q[VERTICAL_QUAD], x + tw, y)
+              end
+  cases[16] = function(self, x, y)
+                local q = self.spritebatch_quads
+                local batch = self.spritebatch
+                batch:add(q[CELL_QUAD], x, y)
+              end
+end
+          
 
 local pgr_mt = { __index = pgr }
 function pgr:new(x, y, width, height)
@@ -34,6 +180,8 @@ function pgr:new(x, y, width, height)
   pgr.marked_cells = {}
   pgr.cell_queue = {}
   pgr.neighbour_storage = {}
+  pgr.surface_cells = {}
+  pgr.flood_fill_cells = {}
   for i=1,8 do
     pgr.neighbour_storage[i] = {i=nil, j=nil}
   end
@@ -45,7 +193,79 @@ function pgr:new(x, y, width, height)
   
   pgr.bbox = bbox:new(x, y, width, height)
   
+  pgr:_init_textures()
+  
   return pgr
+end
+
+function pgr:_generate_triangle_image(width, height)
+  local square = love.image.newImageData(width, height)
+  for j=0,square:getWidth()-1 do
+    for i=0,square:getHeight()-1 do
+      if i > j then
+        square:setPixel(j, i, 255,255,255,255)
+      end
+    end
+  end
+  return lg.newImage(square)
+end
+
+function pgr:_generate_rectangle_image(width, height)
+  local square = love.image.newImageData(width, height)
+  for j=0,square:getWidth()-1 do
+    for i=0,square:getHeight()-1 do
+      square:setPixel(j, i, 255,255,255,255)
+    end
+  end
+  return lg.newImage(square)
+end
+
+
+function pgr:_init_textures()
+  -- blank white shapes
+  local cell_img = self:_generate_rectangle_image(self.cell_width, self.cell_height)
+  local horz_img = self:_generate_rectangle_image(2*self.tile_width, self.tile_height)
+  local vert_img = self:_generate_rectangle_image(self.tile_width, 2*self.tile_height)
+  local triangle_img = self:_generate_triangle_image(self.tile_width, self.tile_height)
+  local tile_img = self:_generate_rectangle_image(self.tile_width, self.tile_height)
+  
+  
+  -- place images on a canvas to generate spritebatch
+  local w = cell_img:getWidth() + horz_img:getWidth() + 
+            vert_img:getWidth() + triangle_img:getWidth() + tile_img:getWidth()
+  local h = cell_img:getHeight()
+  local canvas = lg.newCanvas(w, h)
+  lg.setCanvas(canvas)
+  local x, y = 0, 0
+  lg.draw(cell_img, x, y)
+  x = x + cell_img:getWidth()
+  lg.draw(horz_img, x, y)
+  x = x + horz_img:getWidth()
+  lg.draw(vert_img, x, y)
+  x = x + vert_img:getWidth()
+  lg.draw(triangle_img, x, y)
+  x = x + triangle_img:getWidth()
+  lg.draw(tile_img, x, y)
+  lg.setCanvas()
+  
+  local imgdata = canvas:getImageData()
+  self.spritebatch_image = lg.newImage(imgdata)
+  
+  -- generate quads for the spritebatch image
+  local quads = {}
+  local x, y = 0, 0
+  quads[CELL_QUAD] = lg.newQuad(x, y, self.cell_width, self.cell_height, w, h)
+  x = x + cell_img:getWidth()
+  quads[HORIZONTAL_QUAD] = lg.newQuad(x, y, 2*self.tile_width, self.tile_height, w, h)
+  x = x + horz_img:getWidth()
+  quads[VERTICAL_QUAD] = lg.newQuad(x, y, self.tile_width, 2*self.tile_height, w, h)
+  x = x + vert_img:getWidth()
+  quads[TRIANGLE_QUAD] = lg.newQuad(x, y, self.tile_width, self.tile_height, w, h)
+  x = x + triangle_img:getWidth()
+  quads[TILE_QUAD] = lg.newQuad(x, y, self.tile_width, self.tile_height, w, h)
+  
+  self.spritebatch_quads = quads
+  self.spritebatch = lg.newSpriteBatch(self.spritebatch_image, 5000)
 end
 
 function pgr:keypressed(key)
@@ -195,14 +415,16 @@ end
 -- creates a new cell table
 function pgr:_new_cell_table(i, j, case)
   local cell = {i=i, j=j, case=case}
+  cell.x, cell.y = self:_get_cell_position(cell.i, cell.j)
   return cell
 end
 
 function pgr:_polygonalize_surface()
-  local surface_cells = {}
+  local surface_cells = self.surface_cells
   local neighbours = self.neighbour_storage
   local queue = self.cell_queue
   table.clear(queue)
+  table.clear(surface_cells)
   self:_clear_marked_cells()
   
   local primatives = self.primatives:get_primatives()
@@ -240,9 +462,86 @@ function pgr:_polygonalize_surface()
     end
   end
 
-  self.surface_cells = surface_cells
+end
 
-  self.is_current = true
+function pgr:_flood_fill_surface()
+  local flood_cells = self.flood_fill_cells
+  local neighbours = self.neighbour_storage
+  local queue = self.cell_queue
+  table.clear(queue)
+  table.clear(flood_cells)
+  self:_clear_marked_cells()
+  
+  local primatives = self.primatives:get_primatives()
+  
+  for i=1,#primatives do
+    local primative = primatives[i]
+    
+    -- seed cell is at the centre of each primative
+    local i, j = self:_get_cell_at_position(primative:get_center())
+    if not self:_is_cell_marked(i, j) then
+    
+      self:_mark_cell(i, j)
+      local case = self:_get_cell_marching_square_case(i, j)
+      queue[#queue+1] = self:_new_cell_table(i, j, case)
+      
+      -- flood fill algorithm
+      local in_case = self.cell_inside_case
+      while #queue > 0 do
+        local cell = table.pop(queue)
+        self:_get_cell_neighbours(cell.i, cell.j, neighbours)
+        
+        for i=2,#neighbours,2 do
+          local ncell = neighbours[i]
+          if not self:_is_cell_marked(ncell.i, ncell.j) then
+            self:_mark_cell(ncell.i, ncell.j)
+            local case = self:_get_cell_marching_square_case(ncell.i, ncell.j)
+            if case == in_case then
+              queue[#queue+1] = self:_new_cell_table(ncell.i, ncell.j, case)
+            end
+          end
+        end
+        
+        flood_cells[#flood_cells + 1] = cell
+      end
+    end
+  end
+
+end
+
+function pgr:_draw_to_spritebatch()
+  local cells = self.surface_cells
+  local batch = self.spritebatch
+  local case_funcs = self.marching_square_draw_cases
+  batch:clear()
+  batch:bind()
+  
+  local hw, hh = 0.5 * self.cell_width, 0.5 * self.cell_height
+  local min, max = self.surface_threshold, 1
+  local idiff = 1 / (max - min)
+  local grad = self.gradient
+  local glen = #grad
+  
+  local c = grad[1]
+  batch:setColor(c[1], c[2], c[3], c[4])
+  for i=1,#cells do
+    local cell = cells[i]
+    case_funcs[cell.case](self, cell.x, cell.y)
+  end
+  
+  local fcells = self.flood_fill_cells
+  for i=1,#fcells do
+    local cell = fcells[i]
+    local cx, cy = cell.x + hw, cell.y + hh
+    local val = self.primatives:get_field_value(cx, cy)
+    local ratio = (val - min) * idiff
+    local c = grad[math.floor(1 + ratio * (glen - 1))]
+    batch:setColor(c[1], c[2], c[3], c[4])
+    
+    case_funcs[cell.case](self, cell.x, cell.y)
+  end
+  
+  batch:unbind()
 end
 
 ------------------------------------------------------------------------------
@@ -250,10 +549,20 @@ function pgr:update(dt)
   if self.is_current then return end
   
   self:_polygonalize_surface()
+  self:_flood_fill_surface()
+  self:_draw_to_spritebatch()
+  
+  self.is_current = true
 end
 
 ------------------------------------------------------------------------------
 function pgr:draw()
+  lg.setColor(0, 0, 0, 255)
+  self.bbox:draw()
+
+  lg.setColor(255, 255, 255, 255)
+  lg.draw(self.spritebatch, 0, 0)
+
   if not self.debug then return end
   
   lg.setColor(0, 0, 255, 255)
@@ -314,17 +623,6 @@ function pgr:draw()
     lg.rectangle("fill", x, y, w, h)
   end
   
-  -- cell at mouse position
-  local mx, my = love.mouse.getPosition()
-  local w, h = self.cell_width, self.cell_height
-  local i, j, x, y = self:_get_cell_at_position(mx, my)
-  local case = self:_get_cell_marching_square_case(i, j)
-  
-  lg.setColor(0, 0, 255, 30)
-  lg.rectangle("fill", x, y, w, h)
-  lg.setColor(0, 0, 0, 255)
-  lg.print(case, x, y)
-  
   -- surface cells
   local w, h = self.cell_width, self.cell_height
   local cells = self.surface_cells
@@ -335,6 +633,16 @@ function pgr:draw()
     lg.rectangle("fill", x, y, w, h)
   end
   
+  -- cell at mouse position
+  local mx, my = love.mouse.getPosition()
+  local w, h = self.cell_width, self.cell_height
+  local i, j, x, y = self:_get_cell_at_position(mx, my)
+  local case = self:_get_cell_marching_square_case(i, j)
+  
+  lg.setColor(0, 0, 255, 30)
+  lg.rectangle("fill", x, y, w, h)
+  lg.setColor(255, 0, 0, 255)
+  lg.print(case, x, y)
 end
 
 return pgr
