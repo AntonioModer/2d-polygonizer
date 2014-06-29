@@ -47,8 +47,8 @@ end
 function love.load()
   init()
 
-  pwidth, pheight = 1000, 700
-  polygonizer = polygonizer:new(10, 10, 1000, 700)
+  pwidth, pheight = SCR_WIDTH - 300, SCR_HEIGHT
+  polygonizer = polygonizer:new(0, 0, 1000, 700)
   
   polygonizer:add_point(210, 200)
   polygonizer:add_line(360, 200, 500, 500)

@@ -49,6 +49,16 @@ function ir:set_position(x, y)
   self:translate(tx, ty)
 end
 
+function ir:set_center(x, y)
+  local cx, cy = self:get_center()
+  local tx, ty = x - cx, y - cy
+  self:translate(tx, ty)
+end
+
+function ir:get_bbox()
+  return self.bbox
+end
+
 function ir:translate(tx, ty)
   self.x, self.y = self.x + tx, self.y + ty
   self.bbox:set_position(self.bbox.x + tx, self.bbox.y + ty)
@@ -138,6 +148,12 @@ function ir:update(dt)
 end
 
 ------------------------------------------------------------------------------
+function ir:draw_outline()
+  lg.setColor(0, 255, 0, 255)
+  self.rectangle_bbox:draw()
+  self.bbox:draw()
+end
+
 function ir:draw()
   if not self.debug then return end
   

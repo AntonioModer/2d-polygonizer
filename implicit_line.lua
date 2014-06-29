@@ -59,6 +59,12 @@ function il:set_line(x1, y1, x2, y2)
   self:_init_bbox()
 end
 
+function il:set_center(x, y)
+  local cx, cy = self:get_center()
+  local tx, ty = x - cx, y - cy
+  self:translate(tx, ty)
+end
+
 function il:translate(tx, ty)
   self.x1, self.y1 = self.x1 + tx, self.y1 + ty
   self.x2, self.y2 = self.x2 + tx, self.y2 + ty
@@ -73,6 +79,10 @@ end
 
 function il:set_weight(c)
   self.weight = c
+end
+
+function il:get_bbox()
+  return self.bbox
 end
 
 function il:get_field_value(x, y)
@@ -124,6 +134,31 @@ function il:update(dt)
 end
 
 ------------------------------------------------------------------------------
+function il:draw_outline()
+  lg.setColor(0, 255, 0, 255)
+  lg.setPointSize(5)
+  lg.point(self.x1, self.y1)
+  lg.point(self.x2, self.y2)
+  lg.line(self.x1, self.y1, self.x2, self.y2)
+  
+  local r = self.radius
+  lg.circle("line", self.x1, self.y1, r)
+  lg.circle("line", self.x2, self.y2, r)
+  
+  local perpx, perpy = (self.y1 - self.y2), -(self.x1 - self.x2)
+  local len = math.sqrt(perpx*perpx + perpy*perpy)
+  perpx, perpy = perpx/len, perpy/len
+  local p1x, p1y = self.x1 + r * perpx, self.y1 + r * perpy
+  local p2x, p2y = self.x2 + r * perpx, self.y2 + r * perpy
+  lg.line(p1x, p1y, p2x, p2y)
+  
+  local p1x, p1y = self.x1 + -r * perpx, self.y1 + -r * perpy
+  local p2x, p2y = self.x2 + -r * perpx, self.y2 + -r * perpy
+  lg.line(p1x, p1y, p2x, p2y)
+  
+  self.bbox:draw()
+end
+
 function il:draw()
   if not self.debug then return end
   

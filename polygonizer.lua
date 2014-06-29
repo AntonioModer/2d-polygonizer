@@ -10,6 +10,11 @@ local VERTICAL_QUAD = 3
 local TRIANGLE_QUAD = 4
 local TILE_QUAD = 5
 
+local UI_SELECT = 0
+local UI_ADD_POINT = 1
+local UI_ADD_LINE = 2
+local UI_ADD_RECTANGLE = 3
+
 local pgr = {}
 pgr.table = 'pgr'
 pgr.debug = false
@@ -23,7 +28,7 @@ pgr.cell_height = 2 * pgr.tile_height
 pgr.cols = nil
 pgr.rows = nil
 
-pgr.default_radius = 150
+pgr.default_radius = 100
 pgr.surface_threshold = 0.2
 
 pgr.cell_inside_case = 16
@@ -40,6 +45,9 @@ pgr.gradient = require("orangeyellow")
 pgr.marked_cells = nil
 pgr.cell_queue = nil
 pgr.is_current = false
+
+pgr.ui_mode = UI_SELECT
+pgr.selected_primative = nil
 
 pgr.marching_square_draw_cases = {}
 
@@ -275,6 +283,16 @@ function pgr:keyreleased(key)
 end
 
 function pgr:mousepressed(x, y, button)
+  if not self.bbox:contains_coordinate(x, y) then
+    return
+  end
+  
+  local mode = self.ui_mode
+  
+  if mode == UI_SELECT and button == "l" then
+    local prim = self.primatives:get_primative_at_position(x, y)
+    self.selected_primative = prim
+  end
 end
 
 function pgr:mousereleased(x, y, button)
@@ -535,6 +553,9 @@ function pgr:_draw_to_spritebatch()
     local cx, cy = cell.x + hw, cell.y + hh
     local val = self.primatives:get_field_value(cx, cy)
     local ratio = (val - min) * idiff
+    ratio = math.min(1, ratio)
+    ratio = math.max(0, ratio)
+    
     local c = grad[math.floor(1 + ratio * (glen - 1))]
     batch:setColor(c[1], c[2], c[3], c[4])
     
@@ -545,7 +566,32 @@ function pgr:_draw_to_spritebatch()
 end
 
 ------------------------------------------------------------------------------
+function pgr:_update_primative_selection()
+  if not (self.ui_mode == UI_SELECT and self.selected_primative) then
+    return
+  end
+  
+  if not love.mouse.isDown("l") then
+    return
+  end
+  
+  local primative = self.selected_primative
+  local mx, my = love.mouse.getPosition()
+  local orig_cx, orig_cy = primative:get_center()
+  primative:set_center(mx, my)
+  
+  -- make sure primative's bbox is still inside the polygonizer bbox
+  local bbox = primative:get_bbox()
+  if not self.bbox:contains(bbox) then
+    primative:set_center(orig_cx, orig_cy)
+  end
+  
+  self.is_current = false
+end
+
 function pgr:update(dt)
+  self:_update_primative_selection()
+
   if self.is_current then return end
   
   self:_polygonalize_surface()
@@ -555,16 +601,15 @@ function pgr:update(dt)
   self.is_current = true
 end
 
-------------------------------------------------------------------------------
-function pgr:draw()
-  lg.setColor(0, 0, 0, 255)
-  self.bbox:draw()
-
-  lg.setColor(255, 255, 255, 255)
-  lg.draw(self.spritebatch, 0, 0)
-
-  if not self.debug then return end
+function pgr:_draw_selected_primative()
+  local primative = self.selected_primative
+  if not (primative and self.ui_mode == UI_SELECT) then return end
   
+  primative:draw_outline()
+  
+end
+
+function pgr:_draw_debug()
   lg.setColor(0, 0, 255, 255)
   self.bbox:draw()
   
@@ -643,6 +688,22 @@ function pgr:draw()
   lg.rectangle("fill", x, y, w, h)
   lg.setColor(255, 0, 0, 255)
   lg.print(case, x, y)
+end
+
+------------------------------------------------------------------------------
+function pgr:draw()
+  lg.setColor(0, 0, 0, 255)
+  self.bbox:draw()
+
+  lg.setColor(255, 255, 255, 255)
+  lg.draw(self.spritebatch, 0, 0)
+  
+  self:_draw_selected_primative()
+  
+
+  if not self.debug then return end
+  
+  self:_draw_debug()
 end
 
 return pgr

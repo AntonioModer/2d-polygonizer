@@ -41,6 +41,12 @@ function ip:set_position(x, y)
   self:translate(tx, ty)
 end
 
+function ip:set_center(x, y)
+  local cx, cy = self.x, self.y
+  local tx, ty = x - cx, y - cy
+  self:translate(tx, ty)
+end
+
 function ip:translate(tx, ty)
   self.x, self.y = self.x + tx, self.y + ty
   self.bbox:set_position(self.bbox.x + tx, self.bbox.y + ty)
@@ -77,6 +83,10 @@ function ip:get_center()
   return self.x, self.y
 end
 
+function ip:get_bbox()
+  return self.bbox
+end
+
 function ip:_evaluate_field_function(r)
   local val = 1 - self.field_a * r*r*r*r*r*r + self.field_b * r*r*r*r - self.field_c * r*r
   return val * self.weight
@@ -87,6 +97,12 @@ function ip:update(dt)
 end
 
 ------------------------------------------------------------------------------
+function ip:draw_outline()
+  lg.setColor(0, 255, 0, 255)
+  lg.circle("line", self.x, self.y, self.radius)
+  self.bbox:draw()
+end
+
 function ip:draw()
   if not self.debug then return end
   

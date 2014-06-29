@@ -12,7 +12,7 @@ local ips = {}
 ips.table = 'ips'
 ips.debug = true
 ips.primatives = nil
-ips.ricci_blend = 4
+ips.ricci_blend = 2
 
 local ips_mt = { __index = ips }
 function ips:new()
@@ -76,7 +76,8 @@ function ips:get_primative_at_position(x, y)
         break
       end
     elseif p.table == RECTANGLE then
-      if p.rectangle_bbox:contains_coordinate(x, y) then
+      local f = p:get_field_value(x, y)
+      if f ~= 0 then
         ip = p
         break
       end
