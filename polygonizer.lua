@@ -61,6 +61,9 @@ pgr.ui_mode = UI_SELECT
 pgr.selected_primative = nil
 pgr.interface_buttons = nil
 
+pgr.click_x = nil
+pgr.click_y = nil
+
 pgr.marching_square_draw_cases = {}
 
 do
@@ -323,7 +326,7 @@ function pgr:_init_textures()
   quads[TILE_QUAD] = lg.newQuad(x, y, self.tile_width, self.tile_height, w, h)
   
   self.spritebatch_quads = quads
-  self.spritebatch = lg.newSpriteBatch(self.spritebatch_image, 5000)
+  self.spritebatch = lg.newSpriteBatch(self.spritebatch_image, 9000)
 end
 
 function pgr:keypressed(key)
@@ -362,9 +365,54 @@ function pgr:mousepressed(x, y, button)
     end
     self.is_current = false
   end
+  
+  if mode == UI_ADD_POINT and button == "l" then
+    local p = self:add_point(x, y)
+    -- move to center of bbox if out of range
+    if not self.bbox:contains(p:get_bbox()) then
+      p:set_position(self.bbox.x + 0.5 * self.bbox.width, 
+                     self.bbox.y + 0.5 * self.bbox.height)
+    end
+    self.is_current = false
+  end
+  
+  if mode == UI_ADD_LINE or mode == UI_ADD_RECTANGLE then
+    self.click_x, self.click_y = x, y
+  end
+  
 end
 
 function pgr:mousereleased(x, y, button)
+  if not (self.click_x and self.click_y) then
+    return
+  end
+  
+
+  if button == "l" and self.ui_mode == UI_ADD_LINE then
+    local p = self:add_line(self.click_x, self.click_y, x, y)
+    if not self.bbox:contains(p:get_bbox()) then
+      p:set_center(self.bbox.x + 0.5 * self.bbox.width, 
+                   self.bbox.y + 0.5 * self.bbox.height)
+    end
+  
+    self.is_current = false
+    self.click_x, self.click_y = nil, nil
+  end
+  
+  if button == "l" and self.ui_mode == UI_ADD_RECTANGLE then
+    local x1, y1 = self.click_x, self.click_y
+    local x2, y2 = x, y
+    local x, y = math.min(x1, x2), math.min(y1, y2)
+    local width, height = math.abs(x1 - x2), math.abs(y1 - y2)
+    local p = self:add_rectangle(x, y, width, height)
+    if not self.bbox:contains(p:get_bbox()) then
+      p:set_center(self.bbox.x + 0.5 * self.bbox.width, 
+                   self.bbox.y + 0.5 * self.bbox.height)
+    end
+  
+    self.is_current = false
+    self.click_x, self.click_y = nil, nil
+  end
 end
 
 function pgr:add_point(x, y)
@@ -859,6 +907,28 @@ function pgr:_draw_interface()
   
 end
 
+function pgr:_draw_interface_primative_addition()
+  if not (self.click_x and self.click_y) then return end
+  
+  if self.ui_mode == UI_ADD_LINE then
+    lg.setColor(0, 0, 0, 255)
+    lg.setPointSize(8)
+    local mx, my =  love.mouse:getPosition()
+    lg.point(mx, my)
+    lg.point(self.click_x, self.click_y)
+    lg.line(self.click_x, self.click_y, mx, my)
+  end
+  
+  if self.ui_mode == UI_ADD_RECTANGLE then
+    local x1, y1 = self.click_x, self.click_y
+    local x2, y2 = love.mouse:getPosition()
+    local x, y = math.min(x1, x2), math.min(y1, y2)
+    local width, height = math.abs(x1 - x2), math.abs(y1 - y2)
+    lg.setColor(0, 0, 0, 255)
+    lg.rectangle("line", x, y, width, height)
+  end
+end
+
 ------------------------------------------------------------------------------
 function pgr:draw()
   lg.setColor(0, 0, 0, 255)
@@ -869,7 +939,7 @@ function pgr:draw()
   
   self:_draw_selected_primative()
   self:_draw_interface()
-  
+  self:_draw_interface_primative_addition()
 
   if not self.debug then return end
   
