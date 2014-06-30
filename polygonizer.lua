@@ -1,4 +1,6 @@
 
+
+
 --##########################################################################--
 --[[----------------------------------------------------------------------]]--
 -- polygonizer object
@@ -29,8 +31,8 @@ pgr.debug = false
 pgr.primatives = nil
 pgr.bbox = nil
 
-pgr.tile_width = 4
-pgr.tile_height = 4
+pgr.tile_width = 5
+pgr.tile_height = 5
 pgr.cell_width = 2 * pgr.tile_width
 pgr.cell_height = 2 * pgr.tile_height
 pgr.cols = nil
@@ -45,6 +47,7 @@ pgr.surface_threshold = 0.2
 pgr.cell_inside_case = 16
 pgr.cell_outside_case = 1
 
+pgr.unused_cell_tables = nil
 pgr.surface_cells = nil
 pgr.flood_fill_cells = nil
 
@@ -203,6 +206,7 @@ function pgr:new(x, y, width, height)
   pgr.marked_cells = {}
   pgr.cell_queue = {}
   pgr.neighbour_storage = {}
+  pgr.unused_cell_tables = {}
   pgr.surface_cells = {}
   pgr.flood_fill_cells = {}
   for i=1,8 do
@@ -392,14 +396,17 @@ function pgr:mousereleased(x, y, button)
   
 
   if button == "l" and self.ui_mode == UI_ADD_LINE then
-    local p = self:add_line(self.click_x, self.click_y, x, y)
-    if not self.bbox:contains(p:get_bbox()) then
-      p:set_center(self.bbox.x + 0.5 * self.bbox.width, 
-                   self.bbox.y + 0.5 * self.bbox.height)
+    if math.abs((self.click_x - x) + (self.click_y - y)) > 0 then
+      local p = self:add_line(self.click_x, self.click_y, x, y)
+      if not self.bbox:contains(p:get_bbox()) then
+        p:set_center(self.bbox.x + 0.5 * self.bbox.width, 
+                     self.bbox.y + 0.5 * self.bbox.height)
+      end
+    
+      self.is_current = false
     end
-  
-    self.is_current = false
     self.click_x, self.click_y = nil, nil
+    
   end
   
   if button == "l" and self.ui_mode == UI_ADD_RECTANGLE then
@@ -552,9 +559,26 @@ end
 
 -- creates a new cell table
 function pgr:_new_cell_table(i, j, case)
-  local cell = {i=i, j=j, case=case}
+  local cell
+  if #self.unused_cell_tables > 0 then
+    cell = self.unused_cell_tables[#self.unused_cell_tables]
+    self.unused_cell_tables[#self.unused_cell_tables] = nil
+    cell.i, cell.j, cell.case = i, j, case
+  else
+    cell = {i=i, j=j, case=case}
+  end
   cell.x, cell.y = self:_get_cell_position(cell.i, cell.j)
   return cell
+end
+
+function pgr:_clear_cell_table(tb)
+  local unused = self.unused_cell_tables
+  local idx = #unused + 1
+  for i=#tb,1,-1 do
+    unused[idx] = tb[i]
+    tb[i] = nil
+    idx = idx + 1
+  end
 end
 
 function pgr:_polygonalize_surface()
@@ -562,7 +586,7 @@ function pgr:_polygonalize_surface()
   local neighbours = self.neighbour_storage
   local queue = self.cell_queue
   table.clear(queue)
-  table.clear(surface_cells)
+  self:_clear_cell_table(surface_cells)
   self:_clear_marked_cells()
   
   local primatives = self.primatives:get_primatives()
@@ -607,7 +631,7 @@ function pgr:_flood_fill_surface()
   local neighbours = self.neighbour_storage
   local queue = self.cell_queue
   table.clear(queue)
-  table.clear(flood_cells)
+  self:_clear_cell_table(flood_cells)
   self:_clear_marked_cells()
   
   local primatives = self.primatives:get_primatives()
@@ -757,18 +781,20 @@ function pgr:_update_animation(dt)
     local tx, ty = p.dirx * p.speed * dt, p.diry * p.speed * dt
     p:translate(tx, ty)
     if not self.bbox:contains(p:get_bbox()) then
-      p:set_center(orig_x, orig_y)
-      
-      -- find which wall object bounced off of
-      local minx = math.min(math.abs(self.bbox.x - orig_x), 
-                            math.abs(self.bbox.x + self.bbox.width - orig_x))
-      local miny = math.min(math.abs(self.bbox.y - orig_y), 
-                            math.abs(self.bbox.y + self.bbox.height - orig_y))
-      if minx < miny then
+      local b = p:get_bbox()
+      local cx, cy = p:get_center()
+      local minx, maxx = self.bbox.x + 0.5 * b.width, 
+                         self.bbox.x + self.bbox.width - 0.5 * b.width
+      local miny, maxy = self.bbox.y + 0.5 * b.height, 
+                         self.bbox.y + self.bbox.height - 0.5 * b.height
+      if cx < minx or cx > maxx then
         p.dirx = -p.dirx
-      else
+      end
+      if cy < miny or cy > maxy then
         p.diry = -p.diry
       end
+      
+      p:set_center(orig_x, orig_y)
     end
   end
   

@@ -37,7 +37,7 @@ local function init()
   lg = love.graphics
   SCR_WIDTH = lg.getWidth()
   SCR_HEIGHT = lg.getHeight()
-  DEBUG = true
+  DEBUG = false
   
   -- graphics
   lg.setPointStyle("rough")
@@ -49,11 +49,10 @@ function love.load()
 
   pwidth, pheight = SCR_WIDTH - 530, SCR_HEIGHT
   polygonizer = polygonizer:new(0, 0, pwidth, pheight)
-  
-  polygonizer:add_point(210, 200)
 end
 
 function love.update(dt)
+  polygonizer.debug = love.keyboard.isDown("d")
   polygonizer:update(dt)
 
   
