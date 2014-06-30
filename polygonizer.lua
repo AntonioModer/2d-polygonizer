@@ -326,7 +326,7 @@ function pgr:_init_textures()
   quads[TILE_QUAD] = lg.newQuad(x, y, self.tile_width, self.tile_height, w, h)
   
   self.spritebatch_quads = quads
-  self.spritebatch = lg.newSpriteBatch(self.spritebatch_image, 9000)
+  self.spritebatch = lg.newSpriteBatch(self.spritebatch_image, 20000)
 end
 
 function pgr:keypressed(key)
@@ -344,6 +344,9 @@ function pgr:mousepressed(x, y, button)
       if b.bbox:contains_coordinate(x, y) then
         self.selected_interface_button = b
         self.ui_mode = b.mode
+        if self.ui_mode == UI_ANIMATE then
+          self:_init_animation()
+        end
       end
     end
     
@@ -732,8 +735,49 @@ function pgr:_update_primative_selection(dt)
   self.is_current = false
 end
 
+function pgr:_init_animation()
+  local minv, maxv = 200, 300
+  
+  local primatives = self.primatives:get_primatives()
+  for i=1,#primatives do
+    local p = primatives[i]
+    local angle = 2 * math.pi * math.random()
+    p.dirx, p.diry = math.cos(angle), math.sin(angle)
+    p.speed = minv + math.random() * (maxv - minv)
+  end
+end
+
+function pgr:_update_animation(dt)
+  if self.ui_mode ~= UI_ANIMATE then return end
+  
+  local primatives = self.primatives:get_primatives()
+  for i=1,#primatives do
+    local p = primatives[i]
+    local orig_x, orig_y = p:get_center()
+    local tx, ty = p.dirx * p.speed * dt, p.diry * p.speed * dt
+    p:translate(tx, ty)
+    if not self.bbox:contains(p:get_bbox()) then
+      p:set_center(orig_x, orig_y)
+      
+      -- find which wall object bounced off of
+      local minx = math.min(math.abs(self.bbox.x - orig_x), 
+                            math.abs(self.bbox.x + self.bbox.width - orig_x))
+      local miny = math.min(math.abs(self.bbox.y - orig_y), 
+                            math.abs(self.bbox.y + self.bbox.height - orig_y))
+      if minx < miny then
+        p.dirx = -p.dirx
+      else
+        p.diry = -p.diry
+      end
+    end
+  end
+  
+  self.is_current = false
+end
+
 function pgr:update(dt)
   self:_update_primative_selection(dt)
+  self:_update_animation(dt)
 
   if self.is_current then return end
   

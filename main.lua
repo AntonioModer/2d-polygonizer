@@ -47,12 +47,10 @@ end
 function love.load()
   init()
 
-  pwidth, pheight = SCR_WIDTH - 500, SCR_HEIGHT
+  pwidth, pheight = SCR_WIDTH - 530, SCR_HEIGHT
   polygonizer = polygonizer:new(0, 0, pwidth, pheight)
   
   polygonizer:add_point(210, 200)
-  polygonizer:add_line(360, 200, 500, 500)
-  polygonizer:add_rectangle(750, 200, 100, 300)
 end
 
 function love.update(dt)
