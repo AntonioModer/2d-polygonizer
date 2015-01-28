@@ -1,3 +1,7 @@
+--[[
+  CSC 486A - Assignment #2
+  Ryan Guy V00484803
+]]--
 
 function table.contains(tb, item)
   for k,v in pairs(tb) do

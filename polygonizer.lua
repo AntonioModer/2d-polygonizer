@@ -1,4 +1,7 @@
-
+--[[
+  CSC 486A - Assignment #2
+  Ryan Guy
+]]--
 
 
 --##########################################################################--
@@ -54,7 +57,7 @@ pgr.flood_fill_cells = nil
 pgr.spritebatch_image = nil
 pgr.spritebatch_quads = nil
 pgr.spritebatch = nil
-pgr.gradient = require("orangeyellow")
+pgr.gradient = require("gradients/blue")
 
 pgr.marked_cells = nil
 pgr.cell_queue = nil
@@ -206,7 +209,6 @@ function pgr:new(x, y, width, height)
   pgr.marked_cells = {}
   pgr.cell_queue = {}
   pgr.neighbour_storage = {}
-  pgr.unused_cell_tables = {}
   pgr.surface_cells = {}
   pgr.flood_fill_cells = {}
   for i=1,8 do
@@ -220,14 +222,24 @@ function pgr:new(x, y, width, height)
   
   pgr.bbox = bbox:new(x, y, width, height)
   
+  pgr:_init_cell_tables()
   pgr:_init_textures()
   pgr:_init_interface_buttons()
   
   return pgr
 end
 
+function pgr:_init_cell_tables()
+  self.unused_cell_tables = {}
+  -- populate pgr with some empty cell_tables
+  local n = 6000
+  for i=1,n do
+    self.unused_cell_tables[i] = {}
+  end
+end
+
 function pgr:_init_interface_buttons()
-  local ix, iy = 950, 50
+  local ix, iy = 800, 50
   local x, y = ix, iy
   local xpad = 30
   local bpad = 15
@@ -333,7 +345,42 @@ function pgr:_init_textures()
   self.spritebatch = lg.newSpriteBatch(self.spritebatch_image, 20000)
 end
 
-function pgr:keypressed(key)
+function pgr:keypressed(key)  
+
+ if key == "left" or key == "right" then
+   self.selected_interface_button = self.interface_buttons[1]
+   self.ui_mode = UI_SELECT
+ end
+
+ if self.ui_mode == UI_SELECT then
+   local dir
+   if key == "left" then
+     dir = -1
+   elseif key == "right" then
+     dir = 1
+   end
+   
+   if dir then
+     local primatives = self.primatives:get_primatives()
+     if self.selected_primative then
+       local sp = self.selected_primative
+       for i=1,#primatives do
+         if primatives[i] == sp then
+           local new_idx = i + dir
+           if new_idx < 1 then new_idx = #primatives end
+           if new_idx > #primatives then new_idx = 1 end 
+           
+           self.selected_primative = primatives[new_idx]
+           break
+         end
+       end
+     else
+       self.selected_primative = primatives[#primatives]
+     end
+   end
+ end
+ 
+ 
 end
 
 function pgr:keyreleased(key)
@@ -385,6 +432,37 @@ function pgr:mousepressed(x, y, button)
   
   if mode == UI_ADD_LINE or mode == UI_ADD_RECTANGLE then
     self.click_x, self.click_y = x, y
+  end
+  
+  if button == "wu" or button == "wd" then
+    if not (self.ui_mode == UI_SELECT and self.selected_primative) then
+      return
+    end
+  
+    -- update radius
+    local primative = self.selected_primative
+    local min, max = self.min_radius, self.max_radius
+    local speed = 5
+    local current_radius = primative:get_radius()
+    local orig_radius = current_radius
+    if button == "wu" then
+      current_radius = current_radius + speed
+    elseif button == "wd" then
+      current_radius = current_radius - speed
+    end
+    current_radius = math.min(current_radius, max)
+    current_radius = math.max(current_radius, min)
+    primative:set_radius(current_radius)
+    
+    -- make sure primative's bbox is still inside the polygonizer bbox
+    local bbox = primative:get_bbox()
+    if not self.bbox:contains(bbox) then
+      primative:set_radius(orig_radius)
+    end
+    
+    if current_radius ~= orig_radius then
+      self.is_current = false
+    end
   end
   
 end
@@ -691,19 +769,21 @@ function pgr:_draw_to_spritebatch()
     case_funcs[cell.case](self, cell.x, cell.y)
   end
   
-  local fcells = self.flood_fill_cells
-  for i=1,#fcells do
-    local cell = fcells[i]
-    local cx, cy = cell.x + hw, cell.y + hh
-    local val = self.primatives:get_field_value(cx, cy)
-    local ratio = (val - min) * idiff
-    ratio = math.min(1, ratio)
-    ratio = math.max(0, ratio)
-    
-    local c = grad[math.floor(1 + ratio * (glen - 1))]
-    batch:setColor(c[1], c[2], c[3], c[4])
-    
-    case_funcs[cell.case](self, cell.x, cell.y)
+  if not self.debug then
+    local fcells = self.flood_fill_cells
+    for i=1,#fcells do
+      local cell = fcells[i]
+      local cx, cy = cell.x + hw, cell.y + hh
+      local val = self.primatives:get_field_value(cx, cy)
+      local ratio = (val - min) * idiff
+      ratio = math.min(1, ratio)
+      ratio = math.max(0, ratio)
+      
+      local c = grad[math.floor(1 + ratio * (glen - 1))]
+      batch:setColor(c[1], c[2], c[3], c[4])
+      
+      case_funcs[cell.case](self, cell.x, cell.y)
+    end
   end
   
   batch:unbind()
@@ -767,8 +847,87 @@ function pgr:_init_animation()
     local p = primatives[i]
     local angle = 2 * math.pi * math.random()
     p.dirx, p.diry = math.cos(angle), math.sin(angle)
+    
+    angle = 2 * math.pi * math.random()
+    p.dirx2, p.diry2 = math.cos(angle), math.sin(angle)
     p.speed = minv + math.random() * (maxv - minv)
+    p.speed2 = minv + math.random() * (maxv - minv)
   end
+end
+
+function pgr:_update_point_animation(dt, p)
+  local orig_x, orig_y = p:get_center()
+  local tx, ty = p.dirx * p.speed * dt, p.diry * p.speed * dt
+  p:translate(tx, ty)
+  if not self.bbox:contains(p:get_bbox()) then
+    local b = p:get_bbox()
+    local cx, cy = p:get_center()
+    local minx, maxx = self.bbox.x + 0.5 * b.width, 
+                       self.bbox.x + self.bbox.width - 0.5 * b.width
+    local miny, maxy = self.bbox.y + 0.5 * b.height, 
+                       self.bbox.y + self.bbox.height - 0.5 * b.height
+    if cx < minx or cx > maxx then
+      p.dirx = -p.dirx
+    end
+    if cy < miny or cy > maxy then
+      p.diry = -p.diry
+    end
+    
+    p:set_center(orig_x, orig_y)
+  end        
+end
+
+function pgr:_update_line_animation(dt, p)
+  local orig_x1, orig_y1 = p.x1, p.y1
+  local orig_x2, orig_y2 = p.x2, p.y2
+  
+  local tx1, ty1 = p.dirx * p.speed * dt, p.diry * p.speed * dt
+  local tx2, ty2 = p.dirx2 * p.speed2 * dt, p.diry2 * p.speed2 * dt
+  
+  p:translate_point(tx1, ty1, 1)
+  p:translate_point(tx2, ty2, 2)
+  local xf1, yf1 = p.x1, p.y1
+  local xf2, yf2 = p.x2, p.y2
+ 
+  if not self.bbox:contains(p.p1_bbox) then
+    local b = p.p1_bbox
+    local cx, cy = p.x1, p.y1
+    
+    local minx, maxx = self.bbox.x + 0.5 * b.width, 
+                       self.bbox.x + self.bbox.width - 0.5 * b.width
+    local miny, maxy = self.bbox.y + 0.5 * b.height, 
+                       self.bbox.y + self.bbox.height - 0.5 * b.height
+    if cx < minx or cx > maxx then
+      p.dirx = -p.dirx
+    end
+    if cy < miny or cy > maxy then
+      p.diry = -p.diry
+    end
+    xf1, yf1 = orig_x1, orig_y1
+  end
+  
+  if not self.bbox:contains(p.p2_bbox) then
+    local b = p.p2_bbox
+    local cx, cy = p.x2, p.y2
+    
+    local minx, maxx = self.bbox.x + 0.5 * b.width, 
+                       self.bbox.x + self.bbox.width - 0.5 * b.width
+    local miny, maxy = self.bbox.y + 0.5 * b.height, 
+                       self.bbox.y + self.bbox.height - 0.5 * b.height
+    if cx < minx or cx > maxx then
+      p.dirx2 = -p.dirx2
+    end
+    if cy < miny or cy > maxy then
+      p.diry2 = -p.diry2
+    end
+    xf2, yf2 = orig_x2, orig_y2
+  end
+  
+  p:set_line(xf1, yf1, xf2, yf2)
+end
+
+function pgr:_update_rectangle_animation(dt, p)
+  self:_update_point_animation(dt, p)
 end
 
 function pgr:_update_animation(dt)
@@ -777,24 +936,12 @@ function pgr:_update_animation(dt)
   local primatives = self.primatives:get_primatives()
   for i=1,#primatives do
     local p = primatives[i]
-    local orig_x, orig_y = p:get_center()
-    local tx, ty = p.dirx * p.speed * dt, p.diry * p.speed * dt
-    p:translate(tx, ty)
-    if not self.bbox:contains(p:get_bbox()) then
-      local b = p:get_bbox()
-      local cx, cy = p:get_center()
-      local minx, maxx = self.bbox.x + 0.5 * b.width, 
-                         self.bbox.x + self.bbox.width - 0.5 * b.width
-      local miny, maxy = self.bbox.y + 0.5 * b.height, 
-                         self.bbox.y + self.bbox.height - 0.5 * b.height
-      if cx < minx or cx > maxx then
-        p.dirx = -p.dirx
-      end
-      if cy < miny or cy > maxy then
-        p.diry = -p.diry
-      end
-      
-      p:set_center(orig_x, orig_y)
+    if p.table == "ip" then
+      self:_update_point_animation(dt, p)
+    elseif p.table == "il" then
+      self:_update_line_animation(dt, p)
+    elseif p.table == "ir" then
+      self:_update_rectangle_animation(dt, p)
     end
   end
   
@@ -808,7 +955,9 @@ function pgr:update(dt)
   if self.is_current then return end
   
   self:_polygonalize_surface()
-  self:_flood_fill_surface()
+  if not self.debug then
+    self:_flood_fill_surface()
+  end
   self:_draw_to_spritebatch()
   
   self.is_current = true
@@ -834,7 +983,7 @@ function pgr:_draw_debug()
   local yf = self.bbox.y + self.bbox.height
   for i=1,self.cols-1 do
     x = x + cw
-    lg.line(x, yi, x, yf)
+    --lg.line(x, yi, x, yf)
   end
   
   local y = self.bbox.y
@@ -842,7 +991,7 @@ function pgr:_draw_debug()
   local xf = self.bbox.x + self.bbox.width
   for i=1,self.rows-1 do
     y = y + ch
-    lg.line(xi, y, xf, y)
+    --lg.line(xi, y, xf, y)
   end
   
   -- tile grid
@@ -853,7 +1002,7 @@ function pgr:_draw_debug()
   local yf = self.bbox.y + self.bbox.height
   for i=1,2*self.cols-1 do
     x = x + tw
-    lg.line(x, yi, x, yf)
+    --lg.line(x, yi, x, yf)
   end
   
   local y = self.bbox.y
@@ -861,10 +1010,10 @@ function pgr:_draw_debug()
   local xf = self.bbox.x + self.bbox.width
   for i=1,2*self.rows-1 do
     y = y + tw
-    lg.line(xi, y, xf, y)
+    --lg.line(xi, y, xf, y)
   end
   
-  self.primatives:draw()
+  --self.primatives:draw()
   local primatives = self.primatives:get_primatives()
   for idx=1,#primatives do
     local cx, cy = primatives[idx]:get_center()
@@ -872,7 +1021,7 @@ function pgr:_draw_debug()
     local i, j, x, y = self:_get_cell_at_position(cx, cy)
     
     lg.setColor(0, 0, 255, 30)
-    lg.rectangle("fill", x, y, w, h)
+    --lg.rectangle("fill", x, y, w, h)
     
     -- seed cell
     local i, j = self:_get_primative_seed_cell(primatives[idx])
@@ -933,6 +1082,9 @@ function pgr:_draw_interface_descriptions()
 [[To select an object, hover over the object with
 the mouse and press the left button
 
+Alternatively, use the left and right arrow keys 
+to scroll through objects
+
 To remove an object, hover over the object with
 the mouse and press the right button
                
@@ -941,7 +1093,8 @@ button and drag to the desired position
 
 To change the radius of an object, select the 
 object and press the up or down key on the 
-keyboard to increase or decrease the radius]], x ,y + 30)
+keyboard or use the mouse wheel to increase or 
+decrease the radius]], x ,y + 30)
   elseif mode == UI_ANIMATE then
     lg.setFont(font_bold)
     lg.print("Animation:", x, y)

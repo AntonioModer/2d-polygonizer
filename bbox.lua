@@ -1,3 +1,8 @@
+--[[
+  CSC 486A - Assignment #2
+  Ryan Guy
+]]--l
+
 local UP        = 1
 local UPRIGHT   = 2
 local RIGHT     = 3

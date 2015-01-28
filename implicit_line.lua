@@ -1,3 +1,8 @@
+--[[
+  CSC 486A - Assignment #2
+  Ryan Guy
+]]--
+
 
 --##########################################################################--
 --[[----------------------------------------------------------------------]]--
@@ -15,6 +20,8 @@ il.radius = nil
 il.weight = 1
 il.length = nil
 il.bbox = nil
+il.p1_bbox = nil
+il.p2_bbox = nil
 
 -- for Geoff field function
 il.field_a = nil   -- (4/9) * (1/r^6)
@@ -41,6 +48,8 @@ function il:_init_bbox()
   local r = self.radius
   local b1 = bbox:new(self.x1 - r, self.y1 - r, 2 * r, 2 * r)
   local b2 = bbox:new(self.x2 - r, self.y2 - r, 2 * r, 2 * r)
+  self.p1_bbox = b1
+  self.p2_bbox = b2
   self.bbox = b1:union(b2)
 end
 
@@ -55,7 +64,7 @@ function il:set_line(x1, y1, x2, y2)
   self.x1, self.y1 = x1, y1
   self.x2, self.y2 = x2, y2
   local dx, dy = x1 - x2, y1 - y2
-  il.length = math.sqrt(dx*dx + dy*dy)
+  self.length = math.sqrt(dx*dx + dy*dy)
   self:_init_bbox()
 end
 
@@ -69,6 +78,16 @@ function il:translate(tx, ty)
   self.x1, self.y1 = self.x1 + tx, self.y1 + ty
   self.x2, self.y2 = self.x2 + tx, self.y2 + ty
   self.bbox:set_position(self.bbox.x + tx, self.bbox.y + ty)
+end
+
+function il:translate_point(tx, ty, n)
+  if n == 1 then
+    self.x1, self.y1 = self.x1 + tx, self.y1 + ty
+  else
+    self.x2, self.y2 = self.x2 + tx, self.y2 + ty
+  end
+  
+  self:set_line(self.x1, self.y1, self.x2, self.y2)
 end
 
 function il:set_radius(r)

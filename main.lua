@@ -1,12 +1,22 @@
+--[[
+  CSC 486A - Assignment #2
+  Ryan Guy
+]]--
+
 require("table_utils")
 math.randomseed(os.time())
 math.random()
 math.random()
 math.random()
 
+is_rendering = false
 function love.keypressed(key)
   if key == "escape" then
     love.event.push("quit")
+  end
+
+  if key == "r" then
+    is_rendering = not is_rendering
   end
   
   polygonizer:keypressed(key)
@@ -52,7 +62,11 @@ function love.load()
 end
 
 function love.update(dt)
+  dt = 1/60
+
+  if love.keyboard.isDown("lctrl") then dt = dt / 16 end
   polygonizer.debug = love.keyboard.isDown("d")
+  DEBUG = love.keyboard.isDown("d")
   polygonizer:update(dt)
 
   
@@ -63,9 +77,29 @@ function love.draw()
   
   if DEBUG then
     lg.setColor(0,0,0,255)
-    lg.print("FPS: "..love.timer.getFPS(), 0, 0)
+    --lg.print("FPS: "..love.timer.getFPS(), 0, 0)
+  end
+  
+  if is_rendering then
+    frame_count = frame_count or 0
+    local filename = string.format("%06d.png", frame_count);
+    local imgdata = love.graphics.newScreenshot()
+    imgdata:encode(filename)
+    
+    frame_count = frame_count + 1
+    print("Frame:", frame_count)
   end
 end
+
+
+
+
+
+
+
+
+
+
 
 
 
